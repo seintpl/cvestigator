@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="SEINT (using Claude)">
+<meta name="description" content="A web tool for multiple CVEs description and score lookup - seintpl.github.io/cvestigator">
+<title>CVEstigator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-primary: #0a0e17;
+    --bg-secondary: #111827;
+    --bg-card: #151d2e;
+    --bg-input: #0d1220;
+    --border: #1e2a42;
+    --border-focus: #3b82f6;
+    --text-primary: #e2e8f0;
+    --text-secondary: #8892a8;
+    --text-muted: #4a5568;
+    --accent-blue: #3b82f6;
+    --accent-cyan: #06b6d4;
+    --accent-green: #10b981;
+    --accent-amber: #f59e0b;
+    --accent-red: #ef4444;
+    --accent-purple: #8b5cf6;
+    --severity-critical: #dc2626;
+    --severity-high: #ea580c;
+    --severity-medium: #d97706;
+    --severity-low: #65a30d;
+    --severity-none: #6b7280;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-body: 'IBM Plex Sans', sans-serif;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  /* Background grid effect */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 1.4rem;
+    position: relative;
+  }
+
+  header::after {
+    content: '';
+    display: block;
+    width: 120px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+    margin: 1.2rem auto 0;
+  }
+
+  .logo {
+    font-family: var(--font-mono);
+    font-size: 1.8rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .logo span {
+    color: var(--text-muted);
+    -webkit-text-fill-color: var(--text-muted);
+    font-weight: 300;
+    font-size: 0.9em;
+  }
+
+  .subtitle {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-top: 0.3rem;
+    font-weight: 300;
+    letter-spacing: 0.04em;
+  }
+
+  /* Input Section */
+  .input-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .input-section::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-blue), transparent);
+  }
+
+  .input-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .input-label::before {
+    content: '▸';
+    color: var(--accent-blue);
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 140px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    padding: 1rem;
+    resize: vertical;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    line-height: 1.7;
+  }
+
+  textarea:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+  }
+
+  textarea::placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.65rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+    color: #fff;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(59,130,246,0.3);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--text-secondary);
+    color: var(--text-primary);
+  }
+
+  .btn-export {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--accent-green);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+  }
+
+  .btn-export:hover {
+    background: rgba(16, 185, 129, 0.18);
+    border-color: var(--accent-green);
+  }
+
+  .status-bar {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-left: auto;
+    font-family: var(--font-mono);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .status-bar .count {
+    color: var(--accent-cyan);
+    font-weight: 600;
+  }
+
+  /* Progress */
+  .progress-container {
+    margin-bottom: 1.5rem;
+    display: none;
+  }
+
+  .progress-container.active { display: block; }
+
+  .progress-bar-track {
+    height: 3px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    width: 0%;
+  }
+
+  .progress-text {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    margin-top: 0.4rem;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Table */
+  .table-container {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--bg-card);
+  }
+
+  .table-header-bar {
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: rgba(59,130,246,0.03);
+  }
+
+  .table-title {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .table-title .badge {
+    background: rgba(59,130,246,0.15);
+    color: var(--accent-blue);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+  }
+
+  .table-scroll {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  thead th {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    padding: 0.8rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  thead th:hover {
+    color: var(--accent-cyan);
+    background: rgba(6,182,212,0.06);
+  }
+
+  thead th.sort-active {
+    color: var(--accent-cyan);
+  }
+
+  .sort-icon {
+    display: inline-flex;
+    flex-direction: column;
+    margin-left: 0.35rem;
+    vertical-align: middle;
+    line-height: 0;
+    position: relative;
+    top: -1px;
+  }
+
+  .sort-icon .arrow {
+    font-size: 0.55rem;
+    line-height: 0.6;
+    color: var(--text-muted);
+    transition: color 0.15s;
+  }
+
+  thead th.sort-asc .sort-icon .arrow-up,
+  thead th.sort-desc .sort-icon .arrow-down {
+    color: var(--accent-cyan);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(30,42,66,0.5);
+    transition: background 0.15s;
+  }
+
+  tbody tr:hover { background: rgba(59,130,246,0.04); }
+
+  tbody td {
+    padding: 0.75rem 1rem;
+    vertical-align: top;
+  }
+
+  .cve-id {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: var(--accent-cyan);
+    white-space: nowrap;
+  }
+
+  .desc-cell {
+    max-width: 400px;
+    min-width: 250px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+  }
+
+  .desc-cell .desc-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .desc-cell .desc-text.expanded {
+    -webkit-line-clamp: unset;
+  }
+
+  .score-cell {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.82rem;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .score-badge {
+    display: inline-block;
+    padding: 0.2rem 0.55rem;
+    border-radius: 5px;
+    font-size: 0.78rem;
+    min-width: 42px;
+    text-align: center;
+  }
+
+  .score-critical { background: rgba(220,38,38,0.15); color: var(--severity-critical); }
+  .score-high { background: rgba(234,88,12,0.15); color: var(--severity-high); }
+  .score-medium { background: rgba(217,119,6,0.15); color: var(--severity-medium); }
+  .score-low { background: rgba(101,163,13,0.15); color: var(--severity-low); }
+  .score-none { background: rgba(107,114,128,0.1); color: var(--severity-none); }
+
+  .na-score {
+    color: var(--text-muted);
+    font-weight: 400;
+    font-size: 0.75rem;
+  }
+
+  .links-cell {
+    white-space: nowrap;
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+  }
+
+  .link-pill {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    text-decoration: none;
+    padding: 0.3rem 0.6rem;
+    border-radius: 5px;
+    transition: all 0.15s;
+    display: inline-block;
+  }
+
+  .link-cve {
+    background: rgba(139,92,246,0.1);
+    color: var(--accent-purple);
+    border: 1px solid rgba(139,92,246,0.2);
+  }
+
+  .link-cve:hover {
+    background: rgba(139,92,246,0.2);
+    border-color: var(--accent-purple);
+  }
+
+  .link-nist {
+    background: rgba(245,158,11,0.1);
+    color: var(--accent-amber);
+    border: 1px solid rgba(245,158,11,0.2);
+  }
+
+  .link-nist:hover {
+    background: rgba(245,158,11,0.2);
+    border-color: var(--accent-amber);
+  }
+
+  /* Error row */
+  .error-row td {
+    color: var(--accent-red);
+    font-style: italic;
+  }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-muted);
+  }
+
+  .empty-state svg {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+    opacity: 0.3;
+  }
+
+  .empty-state p {
+    font-size: 0.85rem;
+    margin-top: 0.3rem;
+  }
+
+  /* Loading spinner for button */
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.25);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .container { padding: 1rem; }
+    .controls { flex-direction: column; align-items: stretch; }
+    .status-bar { margin-left: 0; justify-content: center; }
+    .table-header-bar { flex-direction: column; gap: 0.5rem; }
+    .logo { font-size: 1.4rem; }
+  }
+
+  /* Fade-in animation for rows */
+  @keyframes fadeInRow {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  tbody tr {
+    animation: fadeInRow 0.3s ease forwards;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo"><span>::</span>CVEstigator<span>::</span></div>
+    <div class="subtitle">Paste text containing CVE identifiers — get structured vulnerability data from CVE.org</div>
+    <div class="subtitle">This is only a tool and it may be wrong. CVEs can have multiple scores. Check the links to find more info.</div>
+  </header>
+
+  <div class="input-section">
+    <label class="input-label" for="cveInput">Input text with CVE numbers</label>
+    <textarea id="cveInput" placeholder="Paste any text here containing CVE numbers, e.g.:&#10;&#10;The following vulnerabilities were found: CVE-2024-1234, CVE-2023-44271 and CVE-2021-44228 (Log4Shell).&#10;Also check CVE-2024-3094 for the xz backdoor issue."></textarea>
+    <div class="controls">
+      <button class="btn btn-primary" id="lookupBtn" onclick="startLookup()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Lookup CVEs
+      </button>
+      <button class="btn btn-secondary" onclick="clearAll()">Clear</button>
+      <button class="btn btn-export" id="exportBtn" onclick="exportCSV()" style="display:none;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export CSV
+      </button>
+      <div class="status-bar" id="statusBar"></div>
+    </div>
+  </div>
+
+  <div class="progress-container" id="progressContainer">
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-text">
+      <span id="progressLabel">Fetching CVE data...</span>
+      <span id="progressCount">0 / 0</span>
+    </div>
+  </div>
+
+  <div id="resultsArea"></div>
+</div>
+
+<script>
+const API_BASE = 'https://cveawg.mitre.org/api/cve';
+let resultsData = [];
+let sortState = { column: null, direction: 'asc' };
+
+const SORT_COLUMNS = {
+  'id':    r => r.id,
+  'desc':  r => (r.error || r.description || '').toLowerCase(),
+  'v2':    r => r.scores.v2,
+  'v3_0':  r => r.scores.v3_0,
+  'v3_1':  r => r.scores.v3_1,
+  'v4':    r => r.scores.v4,
+};
+
+function sortResults(data) {
+  if (!sortState.column) return data;
+  const accessor = SORT_COLUMNS[sortState.column];
+  if (!accessor) return data;
+  const dir = sortState.direction === 'asc' ? 1 : -1;
+  return [...data].sort((a, b) => {
+    let va = accessor(a), vb = accessor(b);
+    // Nulls always go to the bottom
+    if (va === null && vb === null) return 0;
+    if (va === null) return 1;
+    if (vb === null) return -1;
+    if (typeof va === 'string') return dir * va.localeCompare(vb);
+    return dir * (va - vb);
+  });
+}
+
+function handleSort(column) {
+  if (sortState.column === column) {
+    sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortState.column = column;
+    sortState.direction = 'asc';
+  }
+  renderTable(resultsData);
+}
+
+function thHtml(label, key) {
+  let cls = '';
+  if (sortState.column === key) cls = sortState.direction === 'asc' ? 'sort-active sort-asc' : 'sort-active sort-desc';
+  return `<th class="${cls}" onclick="handleSort('${key}')">${label}<span class="sort-icon"><span class="arrow arrow-up">▲</span><span class="arrow arrow-down">▼</span></span></th>`;
+}
+
+function extractCVEs(text) {
+  const regex = /CVE-\d{4}-\d{4,}/gi;
+  const matches = text.match(regex);
+  if (!matches) return [];
+  // Deduplicate and normalize to uppercase
+  return [...new Set(matches.map(m => m.toUpperCase()))];
+}
+
+function getScoreClass(score) {
+  if (score === null || score === undefined) return 'score-none';
+  const n = parseFloat(score);
+  if (n >= 9.0) return 'score-critical';
+  if (n >= 7.0) return 'score-high';
+  if (n >= 4.0) return 'score-medium';
+  if (n > 0) return 'score-low';
+  return 'score-none';
+}
+
+function extractMetrics(data) {
+  const scores = { v2: null, v3_0: null, v3_1: null, v4: null };
+
+  // Collect all metric objects from CNA and ADP containers
+  const metricSources = [];
+
+  if (data.containers?.cna?.metrics) {
+    metricSources.push(...data.containers.cna.metrics);
+  }
+
+  if (data.containers?.adp) {
+    for (const adp of data.containers.adp) {
+      if (adp.metrics) {
+        metricSources.push(...adp.metrics);
+      }
+    }
+  }
+
+  for (const metric of metricSources) {
+    // CVSS v2
+    if (metric.cvssV2_0) {
+      scores.v2 = scores.v2 || metric.cvssV2_0.baseScore;
+    }
+    // CVSS v3.0
+    if (metric.cvssV3_0) {
+      scores.v3_0 = scores.v3_0 || metric.cvssV3_0.baseScore;
+    }
+    // CVSS v3.1
+    if (metric.cvssV3_1) {
+      scores.v3_1 = scores.v3_1 || metric.cvssV3_1.baseScore;
+    }
+    // CVSS v4.0
+    if (metric.cvssV4_0) {
+      scores.v4 = scores.v4 || metric.cvssV4_0.baseScore;
+    }
+  }
+
+  return scores;
+}
+
+function extractDescription(data) {
+  const descs = data.containers?.cna?.descriptions;
+  if (!descs || descs.length === 0) return 'No description available.';
+  const en = descs.find(d => d.lang === 'en' || d.lang?.startsWith('en'));
+  return (en || descs[0]).value || 'No description available.';
+}
+
+async function fetchCVE(cveId) {
+  const resp = await fetch(`${API_BASE}/${cveId}`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return await resp.json();
+}
+
+
+
+function updateProgress(current, total) {
+  const pct = total > 0 ? (current / total * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressCount').textContent = `${current} / ${total}`;
+}
+
+function renderScoreCell(score) {
+  if (score === null || score === undefined) {
+    return `<span class="na-score">—</span>`;
+  }
+  const cls = getScoreClass(score);
+  return `<span class="score-badge ${cls}">${parseFloat(score).toFixed(1)}</span>`;
+}
+
+function renderTable(results) {
+  if (results.length === 0) {
+    document.getElementById('resultsArea').innerHTML = '';
+    return;
+  }
+
+  const sorted = sortResults(results);
+  let rows = '';
+  sorted.forEach((r, i) => {
+    if (r.error) {
+      rows += `
+        <tr class="error-row" style="animation-delay:${i * 40}ms">
+          <td><span class="cve-id">${r.id}</span></td>
+          <td class="desc-cell" colspan="5">${escapeHtml(r.error)}</td>
+          <td>
+            <div class="links-cell">
+              <a class="link-pill link-cve" href="https://www.cve.org/CVERecord?id=${r.id}" target="_blank" rel="noopener">CVE.org</a>
+              <a class="link-pill link-nist" href="https://nvd.nist.gov/vuln/detail/${r.id}" target="_blank" rel="noopener">NIST</a>
+            </div>
+          </td>
+        </tr>`;
+    } else {
+      rows += `
+        <tr style="animation-delay:${i * 40}ms">
+          <td><span class="cve-id">${r.id}</span></td>
+          <td class="desc-cell"><div class="desc-text" onclick="this.classList.toggle('expanded')" title="Click to expand/collapse">${escapeHtml(r.description)}</div></td>
+          <td class="score-cell">${renderScoreCell(r.scores.v2)}</td>
+          <td class="score-cell">${renderScoreCell(r.scores.v3_0)}</td>
+          <td class="score-cell">${renderScoreCell(r.scores.v3_1)}</td>
+          <td class="score-cell">${renderScoreCell(r.scores.v4)}</td>
+          <td>
+            <div class="links-cell">
+              <a class="link-pill link-cve" href="https://www.cve.org/CVERecord?id=${r.id}" target="_blank" rel="noopener">CVE.org</a>
+              <a class="link-pill link-nist" href="https://nvd.nist.gov/vuln/detail/${r.id}" target="_blank" rel="noopener">NIST</a>
+            </div>
+          </td>
+        </tr>`;
+    }
+  });
+
+  document.getElementById('resultsArea').innerHTML = `
+    <div class="table-container">
+      <div class="table-header-bar">
+        <div class="table-title">
+          Results from CVE.org <span class="badge">${results.length} CVE${results.length !== 1 ? 's' : ''}</span>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              ${thHtml('CVE ID', 'id')}
+              ${thHtml('Description', 'desc')}
+              ${thHtml('CVSS 2.0', 'v2')}
+              ${thHtml('CVSS 3.0', 'v3_0')}
+              ${thHtml('CVSS 3.1', 'v3_1')}
+              ${thHtml('CVSS 4.0', 'v4')}
+              <th style="cursor:default;">Links</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+async function startLookup() {
+  const input = document.getElementById('cveInput').value.trim();
+  if (!input) {
+    return;
+  }
+
+  const cves = extractCVEs(input);
+  if (cves.length === 0) {
+    return;
+  }
+
+  const btn = document.getElementById('lookupBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Looking up...';
+
+  const prog = document.getElementById('progressContainer');
+  prog.classList.add('active');
+  document.getElementById('progressLabel').textContent = 'Fetching CVE data...';
+  updateProgress(0, cves.length);
+
+  resultsData = [];
+  let completed = 0;
+
+  // Process in batches of 5 to be polite to the API
+  const batchSize = 5;
+  for (let i = 0; i < cves.length; i += batchSize) {
+    const batch = cves.slice(i, i + batchSize);
+    const promises = batch.map(async (cveId) => {
+      try {
+        const data = await fetchCVE(cveId);
+        const scores = extractMetrics(data);
+        const description = extractDescription(data);
+        return { id: cveId, description, scores, error: null };
+      } catch (err) {
+        return { id: cveId, description: '', scores: { v2: null, v3_0: null, v3_1: null, v4: null }, error: `Failed to fetch: ${err.message}` };
+      } finally {
+        completed++;
+        updateProgress(completed, cves.length);
+      }
+    });
+
+    const batchResults = await Promise.all(promises);
+    resultsData.push(...batchResults);
+    renderTable(resultsData);
+
+    // Small delay between batches
+    if (i + batchSize < cves.length) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+
+  prog.classList.remove('active');
+  btn.disabled = false;
+  btn.innerHTML = `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    Lookup CVEs`;
+
+  const errCount = resultsData.filter(r => r.error).length;
+  const okCount = resultsData.length - errCount;
+  document.getElementById('statusBar').innerHTML = `Found <span class="count">${okCount}</span> CVE${okCount !== 1 ? 's' : ''}` + (errCount > 0 ? ` · <span style="color:var(--accent-red)">${errCount} error${errCount !== 1 ? 's' : ''}</span>` : '');
+
+  document.getElementById('exportBtn').style.display = resultsData.length > 0 ? 'inline-flex' : 'none';
+
+  if (errCount === 0) {
+  } else {
+  }
+}
+
+function clearAll() {
+  document.getElementById('cveInput').value = '';
+  document.getElementById('resultsArea').innerHTML = '';
+  document.getElementById('statusBar').innerHTML = '';
+  document.getElementById('exportBtn').style.display = 'none';
+  document.getElementById('progressContainer').classList.remove('active');
+  resultsData = [];
+  sortState = { column: null, direction: 'asc' };
+}
+
+function exportCSV() {
+  if (resultsData.length === 0) return;
+
+  const headers = ['CVE ID', 'Description', 'CVSS 2.0', 'CVSS 3.0', 'CVSS 3.1', 'CVSS 4.0', 'CVE.org Link', 'NIST Link'];
+  const rows = resultsData.map(r => [
+    r.id,
+    `"${(r.error || r.description).replace(/"/g, '""')}"`,
+    r.scores.v2 ?? '',
+    r.scores.v3_0 ?? '',
+    r.scores.v3_1 ?? '',
+    r.scores.v4 ?? '',
+    `https://www.cve.org/CVERecord?id=${r.id}`,
+    `https://nvd.nist.gov/vuln/detail/${r.id}`
+  ]);
+
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cve-report-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Allow Ctrl+Enter to trigger lookup
+document.getElementById('cveInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    startLookup();
+  }
+});
+</script>
+
+</body>
+</html>

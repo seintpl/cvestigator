@@ -8,3 +8,5 @@ The tool provides a deduplicated list with CVE number, description, scores in di
 This is only a tool and it may be wrong.
 
 CVEs can have multiple scores, so please check the provided links to CVE details in different sites to find more info.
+
+*This tool was made mainly using Claude*
